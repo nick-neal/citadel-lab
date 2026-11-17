@@ -39,7 +39,7 @@ nftables_ip_forward: true
 nftables_masquerade_zone: wan
 
 nftables_defines:
-  DC: 10.100.0.10
+  DC: 10.100.0.2
   VPN_PORT: 1194
 
 nftables_zones:
