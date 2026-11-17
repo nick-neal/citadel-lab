@@ -20,12 +20,12 @@ kea_dhcp4_subnets:
       - hw-address: "00:0c:29:2a:05:63"
         ip-address: 10.100.0.5
         hostname: ansible
-      - hw-address: "00:00:00:00:00:00"
-        ip-address: 10.100.0.10
-        hostname: db01.citadel.local
-      - hw-address: "00:00:00:00:00:00"
-        ip-address: 10.100.0.20
-        hostname: elk.citadel.local
+      #- hw-address: "00:00:00:00:00:00"
+      #  ip-address: 10.100.0.10
+      #  hostname: db01.citadel.local
+      #- hw-address: "00:00:00:00:00:00"
+      #  ip-address: 10.100.0.20
+      #  hostname: elk.citadel.local
   - id: 20
     subnet: 172.20.1.0/24
     interface: ens35
