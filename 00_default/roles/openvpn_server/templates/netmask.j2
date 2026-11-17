@@ -1,0 +1,6 @@
+{# netmask('10.200.0.0/24') -> 255.255.255.0  (OpenVPN wants dotted masks) #}
+{% macro netmask(cidr) -%}
+{%- set m = 2 ** 32 - 2 ** (32 - cidr.split('/')[1] | int) -%}
+{{ (m // 16777216) % 256 }}.{{ (m // 65536) % 256 }}.{{ (m // 256) % 256 }}.{{ m % 256 }}
+{%- endmacro %}
+{% macro network(cidr) -%}{{ cidr.split('/')[0] }}{%- endmacro %}

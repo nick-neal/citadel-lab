@@ -1,0 +1,44 @@
+---
+- name: Check this is a supported distro
+  ansible.builtin.assert:
+    that: ansible_facts.os_family in ['Debian']
+    fail_msg: "this kea_dhcp4 role only supports Debian/Ubuntu hosts, not {{ ansible_facts.os_family }}"
+    quiet: true
+
+- name: Load distro-specific package and service names
+  ansible.builtin.include_vars: "{{ ansible_facts.os_family }}.yml"
+
+- name: Install Kea DHCPv4
+  ansible.builtin.package:
+    name: "{{ kea_dhcp4_package }}"
+    state: present
+
+- name: Deploy kea-dhcp4.conf
+  ansible.builtin.template:
+    src: kea-dhcp4.conf.j2
+    dest: "{{ kea_dhcp4_conf_dest }}"
+    owner: root
+    group: root
+    mode: "0644"
+    backup: true
+    validate: /usr/sbin/kea-dhcp4 -t %s
+  notify: Restart kea-dhcp4
+
+- name: Enable and start Kea DHCPv4
+  ansible.builtin.service:
+    name: "{{ kea_dhcp4_service }}"
+    enabled: true
+    state: started
+
+- name: Apply pending restart
+  ansible.builtin.meta: flush_handlers
+
+- name: Gather service state
+  ansible.builtin.service_facts:
+
+- name: Confirm Kea DHCPv4 is running
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.services.get(kea_dhcp4_service ~ '.service', {}).get('state') == 'running'
+    fail_msg: "{{ kea_dhcp4_service }} is not running - check: journalctl -u {{ kea_dhcp4_service }}"
+    quiet: true

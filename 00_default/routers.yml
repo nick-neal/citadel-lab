@@ -1,0 +1,7 @@
+- name: Configure routers
+  hosts: routers
+  become: true
+  roles:
+    - kea_dhcp4
+    - nftables
+    - openvpn_server    

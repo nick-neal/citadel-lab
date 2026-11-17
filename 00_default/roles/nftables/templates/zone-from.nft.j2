@@ -1,0 +1,32 @@
+# {{ ansible_managed }}
+#
+# from_{{ nftables__zone.name }}: what {{ nftables__zone.name }} ({{ nftables__zone.interface }}) may SEND
+# Rules: nftables_zones[{{ nftables__zone.name }}].from_rules in the inventory.
+#   drop   = block it here
+#   return = let it continue to the destination zone's to_* chain
+# Never "accept" here, or the destination's to_* chain is skipped.
+
+table inet filter {
+    chain from_{{ nftables__zone.name }} {
+        # Anti-spoofing
+{% if nftables__zone.inside | default(false) %}
+        ip saddr != ${{ nftables__zone.name | upper }}_NET drop
+{% else %}
+        ip saddr $INSIDE_NETS drop
+{% endif %}
+{% if nftables__zone.from_rules | default([]) | length > 0 %}
+
+{% for rule in nftables__zone.from_rules %}
+        {{ rule }}
+{% endfor %}
+{% endif %}
+
+{% if nftables__zone.from_policy | default('open') == 'locked' %}
+        # policy: LOCKED - only traffic returned above gets through
+        limit rate {{ nftables_log_limit }} log prefix "from_{{ nftables__zone.name }} drop: "
+        drop
+{% else %}
+        # policy: OPEN - fall through to the destination's to_* chain
+{% endif %}
+    }
+}

@@ -1,0 +1,97 @@
+# KEA
+kea_dhcp4_interfaces: [ens34, ens35]
+
+kea_dhcp4_option_data:
+  - { name: domain-name-servers, data: 10.100.0.2 }
+  - { name: domain-name, data: citadel.local }
+  - { name: domain-search, data: citadel.local }
+  - { name: ntp-servers, data: 10.100.0.2 }
+
+kea_dhcp4_subnets:
+  - id: 10
+    subnet: 10.100.0.0/24
+    interface: ens34
+    option-data:
+      - { name: routers, data: 10.100.0.1 }
+    reservations:
+      - hw-address: "00:00:00:00:00:00"
+        ip-address: 10.100.0.2
+        hostname: dc01.citadel.local
+      - hw-address: "00:0c:29:2a:05:63"
+        ip-address: 10.100.0.5
+        hostname: ansible
+      - hw-address: "00:00:00:00:00:00"
+        ip-address: 10.100.0.10
+        hostname: db01.citadel.local
+      - hw-address: "00:00:00:00:00:00"
+        ip-address: 10.100.0.20
+        hostname: elk.citadel.local
+  - id: 20
+    subnet: 172.20.1.0/24
+    interface: ens35
+    pools:
+      - pool: 172.20.1.100 - 172.20.1.250
+    option-data:
+      - { name: routers, data: 172.20.1.1 }
+
+# NFTABLES      
+nftables_ip_forward: true
+nftables_masquerade_zone: wan
+
+nftables_defines:
+  DC: 10.100.0.10
+  VPN_PORT: 1194
+
+nftables_zones:
+  - name: wan
+    interface: ens33
+    networks: [192.168.0.0/16]
+    inside: false
+    to_rules:
+      # Holes into the upstream network go ABOVE the block, e.g.
+      # - iifname $VLAN10_IF ip saddr $DC ip daddr 192.168.1.1 udp dport 53 accept
+      - ip daddr $WAN_NET drop
+    to_policy: open          # inside zones -> internet
+
+  - name: vlan10
+    interface: ens34
+    networks: [10.100.0.0/24]
+    inside: true
+    from_rules: []
+    to_rules: []
+    # to_rules:
+    #   - iifname $VLAN20_IF ip daddr $DC udp dport { 53, 88, 123, 389 } accept
+    #   - iifname $VLAN20_IF ip daddr $DC tcp dport { 53, 88, 135, 389, 445, 636, 3268 } accept
+    from_policy: open
+    to_policy: open
+
+  - name: vlan20
+    interface: ens35
+    networks: [172.20.1.0/24]
+    inside: true
+    from_rules: []
+    to_rules: []
+    from_policy: open
+    to_policy: open
+
+  - name: vpn
+    interface: tun0
+    networks: [10.200.0.0/24]
+    inside: true
+    from_rules: []
+    to_rules: []
+    from_policy: open
+    to_policy: open
+
+# OPENVPN
+openvpn_server_remote: vpn.example.com
+openvpn_server_network: 172.18.0.0/24
+openvpn_server_push_routes:
+  - 10.100.0.0/24
+  - 172.20.1.0/24
+openvpn_server_dns: [10.100.0.2]
+openvpn_server_domain: citadel.local
+openvpn_server_ca_nopass: true
+openvpn_server_clients:
+  - name: nick-laptop
+  - name: nick-desktop

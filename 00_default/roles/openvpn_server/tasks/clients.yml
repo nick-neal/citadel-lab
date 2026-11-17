@@ -1,0 +1,171 @@
+---
+# Every client gets state: present unless it says otherwise.
+- name: Sort clients into present and absent
+  ansible.builtin.set_fact:
+    openvpn_server__present: >-
+      {{ [{'state': 'present'}] | product(openvpn_server_clients) | map('combine')
+         | selectattr('state', 'eq', 'present') | list }}
+    openvpn_server__absent: >-
+      {{ [{'state': 'present'}] | product(openvpn_server_clients) | map('combine')
+         | selectattr('state', 'eq', 'absent') | list }}
+
+# ---- certificates ----
+- name: Issue client certificates
+  ansible.builtin.command: ./easyrsa build-client-full {{ item.name }} nopass
+  args:
+    chdir: "{{ openvpn_server_pki_dir }}"
+    creates: "{{ openvpn_server_pki_dir }}/pki/issued/{{ item.name }}.crt"
+  environment:
+    EASYRSA_BATCH: "1"
+    EASYRSA_ALGO: ec
+    EASYRSA_PASSIN: "file:{{ openvpn_server__pass_file }}"
+  loop: "{{ openvpn_server__present }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+# easy-rsa moves a revoked certificate out of issued/, so "removes" makes this
+# run once per client.
+- name: Revoke removed clients
+  ansible.builtin.command: ./easyrsa revoke {{ item.name }}
+  args:
+    chdir: "{{ openvpn_server_pki_dir }}"
+    removes: "{{ openvpn_server_pki_dir }}/pki/issued/{{ item.name }}.crt"
+  environment:
+    EASYRSA_BATCH: "1"
+    EASYRSA_PASSIN: "file:{{ openvpn_server__pass_file }}"
+  loop: "{{ openvpn_server__absent }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+# Rebuild the CRL whenever easy-rsa's certificate database (index.txt) is newer
+# than it. Based on state rather than "did revoke change", so a run that fails
+# right after a revoke still gets the CRL rebuilt next time.
+- name: Check when the certificate database and CRL last changed
+  ansible.builtin.stat:
+    path: "{{ openvpn_server_pki_dir }}/pki/{{ item }}"
+  loop: [index.txt, crl.pem]
+  register: openvpn_server__pki_stat
+
+- name: Rebuild the revocation list
+  ansible.builtin.command: ./easyrsa gen-crl
+  args:
+    chdir: "{{ openvpn_server_pki_dir }}"
+  environment:
+    EASYRSA_BATCH: "1"
+    EASYRSA_CRL_DAYS: "{{ openvpn_server_crl_days }}"
+    EASYRSA_PASSIN: "file:{{ openvpn_server__pass_file }}"
+  when: openvpn_server__pki_stat.results[0].stat.mtime > openvpn_server__pki_stat.results[1].stat.mtime
+  changed_when: true
+
+# OpenVPN re-reads the CRL on every connection, after dropping privileges:
+# world-readable, and no restart needed.
+- name: Install the revocation list
+  ansible.builtin.copy:
+    src: "{{ openvpn_server_pki_dir }}/pki/crl.pem"
+    dest: /etc/openvpn/server/crl.pem
+    remote_src: true
+    owner: root
+    group: root
+    mode: "0644"
+
+# ---- fixed addresses ----
+- name: Write fixed-address files for clients with an ip
+  ansible.builtin.template:
+    src: ccd.j2
+    dest: /etc/openvpn/server/ccd/{{ item.name }}
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ openvpn_server__present | selectattr('ip', 'defined') | list }}"
+  loop_control:
+    label: "{{ item.name }} -> {{ item.ip }}"
+
+- name: Remove fixed-address files that are no longer wanted
+  ansible.builtin.file:
+    path: /etc/openvpn/server/ccd/{{ item.name }}
+    state: absent
+  loop: "{{ openvpn_server__absent + openvpn_server__present | rejectattr('ip', 'defined') | list }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+# ---- profiles ----
+- name: Create the client profile directory
+  ansible.builtin.file:
+    path: /etc/openvpn/clients
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Read the shared CA certificate and tls-crypt key
+  ansible.builtin.slurp:
+    src: "{{ item }}"
+  loop:
+    - /etc/openvpn/server/ca.crt
+    - /etc/openvpn/server/tls-crypt.key
+  register: openvpn_server__shared
+  no_log: true
+
+- name: Read client certificates
+  ansible.builtin.slurp:
+    src: "{{ openvpn_server_pki_dir }}/pki/issued/{{ item.name }}.crt"
+  loop: "{{ openvpn_server__present }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: openvpn_server__certs
+
+- name: Read client keys
+  ansible.builtin.slurp:
+    src: "{{ openvpn_server_pki_dir }}/pki/private/{{ item.name }}.key"
+  loop: "{{ openvpn_server__present }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: openvpn_server__keys
+  no_log: true
+
+- name: Write client profiles
+  ansible.builtin.template:
+    src: client.ovpn.j2
+    dest: /etc/openvpn/clients/{{ item.name }}.ovpn
+    owner: root
+    group: root
+    mode: "0600"
+  vars:
+    openvpn_server__ca: "{{ openvpn_server__shared.results[0].content | b64decode }}"
+    openvpn_server__tls_crypt: "{{ openvpn_server__shared.results[1].content | b64decode }}"
+    openvpn_server__cert: "{{ openvpn_server__certs.results[idx].content | b64decode }}"
+    openvpn_server__key: "{{ openvpn_server__keys.results[idx].content | b64decode }}"
+  loop: "{{ openvpn_server__present }}"
+  loop_control:
+    label: "{{ item.name }}"
+    index_var: idx
+  no_log: true
+
+- name: Copy client profiles back to the Ansible machine
+  ansible.builtin.fetch:
+    src: /etc/openvpn/clients/{{ item.name }}.ovpn
+    dest: "{{ openvpn_server_fetch_dir }}/{{ item.name }}.ovpn"
+    flat: true
+  loop: "{{ openvpn_server__present }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: openvpn_server_fetch_profiles
+
+- name: Delete profiles of removed clients
+  ansible.builtin.file:
+    path: /etc/openvpn/clients/{{ item.name }}.ovpn
+    state: absent
+  loop: "{{ openvpn_server__absent }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Delete fetched copies of removed clients' profiles
+  ansible.builtin.file:
+    path: "{{ openvpn_server_fetch_dir }}/{{ item.name }}.ovpn"
+    state: absent
+  loop: "{{ openvpn_server__absent }}"
+  loop_control:
+    label: "{{ item.name }}"
+  delegate_to: localhost
+  become: false
+  when: openvpn_server_fetch_profiles
