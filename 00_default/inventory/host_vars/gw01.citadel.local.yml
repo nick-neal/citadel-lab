@@ -42,6 +42,21 @@ nftables_defines:
   DC: 10.100.0.2
   VPN_PORT: 1194
 
+nftables_input_rules:
+  # Inside zones may not reach the router's own upstream address
+  - iifname $INSIDE_IFS ip daddr $WAN_NET drop
+  - meta l4proto { icmp, ipv6-icmp } accept
+  # DHCP server (Kea)
+  - iifname { $VLAN10_IF, $VLAN20_IF } udp dport 67 accept
+  # SSH management from the VLANs and VPN
+  - iifname $INSIDE_IFS tcp dport 22 accept
+  # OpenVPN server
+  - iifname $WAN_IF udp dport $VPN_PORT accept
+  # DHCP client replies, if ens33 gets its address by DHCP
+  - iifname $WAN_IF udp sport 67 udp dport 68 accept
+  # SSH from the upstream network - optional, see below
+  # - iifname $WAN_IF ip saddr $WAN_NET tcp dport 22 accept
+
 nftables_zones:
   - name: wan
     interface: ens33
