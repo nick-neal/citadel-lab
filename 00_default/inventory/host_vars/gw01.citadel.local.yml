@@ -76,7 +76,7 @@ nftables_zones:
 
   - name: vpn
     interface: tun0
-    networks: [10.200.0.0/24]
+    networks: [172.18.0.0/24]
     inside: true
     from_rules: []
     to_rules: []
@@ -84,7 +84,7 @@ nftables_zones:
     to_policy: open
 
 # OPENVPN
-openvpn_server_remote: vpn.example.com
+openvpn_server_remote: vpn.citadel.local
 openvpn_server_network: 172.18.0.0/24
 openvpn_server_push_routes:
   - 10.100.0.0/24
