@@ -13,15 +13,28 @@
     name: "{{ kea_dhcp4_package }}"
     state: present
 
-- name: Deploy kea-dhcp4.conf
+- name: Render candidate kea-dhcp4.conf
   ansible.builtin.template:
     src: kea-dhcp4.conf.j2
+    dest: "{{ kea_dhcp4_conf_dest }}.candidate"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Check the candidate config
+  ansible.builtin.command: /usr/sbin/kea-dhcp4 -t {{ kea_dhcp4_conf_dest }}.candidate
+  changed_when: false
+
+- name: Deploy kea-dhcp4.conf
+  ansible.builtin.copy:
+    src: "{{ kea_dhcp4_conf_dest }}.candidate"
     dest: "{{ kea_dhcp4_conf_dest }}"
+    remote_src: true
     owner: root
     group: root
     mode: "0644"
     backup: true
-    validate: /usr/sbin/kea-dhcp4 -t %s
+  when: not ansible_check_mode
   notify: Restart kea-dhcp4
 
 - name: Enable and start Kea DHCPv4
