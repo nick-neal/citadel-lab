@@ -14,7 +14,7 @@ kea_dhcp4_subnets:
     option-data:
       - { name: routers, data: 10.100.0.1 }
     reservations:
-      - hw-address: "00:00:00:00:00:00"
+      - hw-address: "00:0c:29:88:dd:ad"
         ip-address: 10.100.0.2
         hostname: dc01.citadel.local
       - hw-address: "00:0c:29:2a:05:63"
