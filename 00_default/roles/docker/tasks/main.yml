@@ -1,0 +1,87 @@
+---
+- name: Check this is a supported distro
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.distribution in docker__repo_distros
+      - ansible_facts.os_family != 'Debian' or ansible_facts.architecture in docker__apt_arch
+    fail_msg: >-
+      docker role supports {{ docker__repo_distros.keys() | join(', ') }},
+      not {{ ansible_facts.distribution }} {{ ansible_facts.architecture }}
+    quiet: true
+
+- name: Load distro-family package lists
+  ansible.builtin.include_vars: "{{ ansible_facts.os_family }}.yml"
+
+# ---- 1. remove unofficial packages ----
+# Only names that are really installed (package_facts) are passed on. On apt,
+# Docker's containerd.io "provides" containerd and runc; apt and Ansible both
+# leave it alone when asked to remove those names (checked), but filtering
+# first keeps this step a clean "skipped" on every rerun. package_facts is
+# also used by repo-Debian.yml.
+- name: List installed packages
+  ansible.builtin.package_facts:
+
+- name: Remove conflicting packages
+  ansible.builtin.package:
+    name: "{{ docker__conflicting_packages | select('in', ansible_facts.packages) | list }}"
+    state: absent
+  when:
+    - docker_remove_conflicting_packages
+    - docker__conflicting_packages | select('in', ansible_facts.packages) | list | length > 0
+
+# ---- 2. Docker's repository ----
+- name: Add Docker's repository
+  ansible.builtin.include_tasks: "repo-{{ ansible_facts.os_family }}.yml"
+
+# ---- 3. install ----
+- name: Install Docker
+  ansible.builtin.package:
+    name: "{{ docker_packages }}"
+    state: present
+
+- name: Create /etc/docker
+  ansible.builtin.file:
+    path: /etc/docker
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Write /etc/docker/daemon.json
+  ansible.builtin.template:
+    src: daemon.json.j2
+    dest: /etc/docker/daemon.json
+    owner: root
+    group: root
+    mode: "0644"
+    validate: dockerd --validate --config-file=%s
+  notify: Restart docker
+
+- name: Enable and start containerd and Docker
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    enabled: true
+    state: started
+  loop: [containerd, docker]
+
+- name: Add users to the docker group
+  ansible.builtin.user:
+    name: "{{ item }}"
+    groups: docker
+    append: true
+  loop: "{{ docker_users }}"
+
+# ---- 4. check it works ----
+- name: Apply pending restart
+  ansible.builtin.meta: flush_handlers
+
+- name: Ask the Docker daemon for its version
+  ansible.builtin.command: docker version --format '{{ "{{" }}.Server.Version{{ "}}" }}'
+  register: docker__version
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: Show the Docker version
+  ansible.builtin.debug:
+    msg: "Docker {{ docker__version.stdout }} is running"
+  when: not ansible_check_mode

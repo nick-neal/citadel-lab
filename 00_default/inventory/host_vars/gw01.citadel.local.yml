@@ -29,6 +29,9 @@ kea_dhcp4_subnets:
       #- hw-address: "00:00:00:00:00:00"
       #  ip-address: 10.100.0.20
       #  hostname: elk.citadel.local
+      - hw-address: "00:50:56:38:94:15"
+        ip-address: 10.100.0.30
+        hostname: docker.citadel.local
   - id: 20
     subnet: 172.20.1.0/24
     interface: ens35

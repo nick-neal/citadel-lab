@@ -1,0 +1,16 @@
+---
+# Unofficial packages Docker's RHEL / Rocky / Alma / Fedora guides say to
+# remove first. Note this includes podman.
+docker__conflicting_packages:
+  - docker
+  - docker-client
+  - docker-client-latest
+  - docker-common
+  - docker-latest
+  - docker-latest-logrotate
+  - docker-logrotate
+  - docker-engine
+  - docker-selinux
+  - docker-engine-selinux
+  - podman
+  - runc

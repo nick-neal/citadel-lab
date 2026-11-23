@@ -1,0 +1,7 @@
+---
+# Restarting dockerd stops running containers (unless live-restore is on);
+# ones with a restart policy come back by themselves.
+- name: Restart docker
+  ansible.builtin.systemd:
+    name: docker
+    state: restarted

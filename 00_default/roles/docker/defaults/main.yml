@@ -1,0 +1,40 @@
+---
+# Defaults for the docker role: Docker CE from Docker's own repository
+# (download.docker.com), not the distro's docker.io / podman packages.
+#
+# Supported: Ubuntu, Debian, RHEL, Rocky, AlmaLinux, CentOS Stream, Fedora.
+#
+# FIREWALL WARNING: Docker writes its own firewall rules (iptables-nft) and
+# its published ports bypass host firewalls like ufw/firewalld. Don't run the
+# nftables role on a Docker host as-is: its "flush ruleset" wipes Docker's
+# rules and breaks container networking until Docker restarts.
+
+docker_packages:
+  - docker-ce
+  - docker-ce-cli
+  - containerd.io
+  - docker-buildx-plugin
+  - docker-compose-plugin
+
+# Remove the distro's unofficial Docker/Podman packages first, as Docker's
+# install guide says. Only packages that are actually installed are removed.
+docker_remove_conflicting_packages: true
+
+# Users added to the "docker" group so they can run docker without sudo.
+# Membership is equivalent to root on the host - only add people you'd give
+# root to. Takes effect at their next login.
+docker_users: []
+
+# /etc/docker/daemon.json, as YAML. Checked with "dockerd --validate" before
+# it's installed. Default: cap container logs at 3 x 10 MB each, so a chatty
+# container can't fill the disk.
+docker_daemon_options:
+  log-driver: json-file
+  log-opts:
+    max-size: 10m
+    max-file: "3"
+# Other common options:
+#   live-restore: true                  # containers keep running when dockerd restarts
+#   data-root: /srv/docker              # move images/volumes off /var
+#   default-address-pools:              # avoid clashing with your LAN ranges
+#     - { base: 172.30.0.0/16, size: 24 }

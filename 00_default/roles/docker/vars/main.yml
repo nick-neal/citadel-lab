@@ -1,0 +1,21 @@
+---
+# Folder under https://download.docker.com/linux/ for each distro
+docker__repo_distros:
+  Ubuntu: ubuntu
+  Debian: debian
+  RedHat: rhel
+  Rocky: rocky
+  AlmaLinux: alma
+  CentOS: centos
+  Fedora: fedora
+
+# Docker's release signing key, as published in its install guide
+docker__gpg_fingerprint: 060A61C51B558A7F742B77AAC52FEB6B621E9F35
+
+# Ansible's architecture name -> Debian's
+docker__apt_arch:
+  x86_64: amd64
+  aarch64: arm64
+  armv7l: armhf
+  ppc64le: ppc64el
+  s390x: s390x

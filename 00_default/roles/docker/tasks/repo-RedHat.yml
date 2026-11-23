@@ -1,0 +1,18 @@
+---
+# Docker's RHEL-family guides add the distro's own .repo file
+# (dnf config-manager --add-repo .../linux/<distro>/docker-ce.repo).
+# Downloading that same file keeps the repo exactly as Docker publishes it.
+
+- name: Import Docker's signing key (checked against its published fingerprint)
+  ansible.builtin.rpm_key:
+    key: https://download.docker.com/linux/{{ docker__repo_distros[ansible_facts.distribution] }}/gpg
+    fingerprint: "{{ docker__gpg_fingerprint }}"
+    state: present
+
+- name: Add Docker's repository
+  ansible.builtin.get_url:
+    url: https://download.docker.com/linux/{{ docker__repo_distros[ansible_facts.distribution] }}/docker-ce.repo
+    dest: /etc/yum.repos.d/docker-ce.repo
+    owner: root
+    group: root
+    mode: "0644"

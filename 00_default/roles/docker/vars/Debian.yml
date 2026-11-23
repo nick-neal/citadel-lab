@@ -1,0 +1,11 @@
+---
+# Unofficial packages Docker's Debian/Ubuntu guide says to remove first
+docker__conflicting_packages:
+  - docker.io
+  - docker-compose
+  - docker-compose-v2
+  - docker-doc
+  - docker-buildx
+  - podman-docker
+  - containerd
+  - runc
