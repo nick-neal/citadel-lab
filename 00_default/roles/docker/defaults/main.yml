@@ -38,3 +38,5 @@ docker_daemon_options:
 #   data-root: /srv/docker              # move images/volumes off /var
 #   default-address-pools:              # avoid clashing with your LAN ranges
 #     - { base: 172.30.0.0/16, size: 24 }
+  default-address-pools:
+    - { base: 192.168.100.0/24, size: 24 }
