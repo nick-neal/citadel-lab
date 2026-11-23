@@ -39,4 +39,4 @@ docker_daemon_options:
 #   default-address-pools:              # avoid clashing with your LAN ranges
 #     - { base: 172.30.0.0/16, size: 24 }
   default-address-pools:
-    - { base: 10.10.0.0/16, size: 24 }
+    - { base: 172.25.0.0/16, size: 24 }
