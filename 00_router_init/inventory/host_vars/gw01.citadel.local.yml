@@ -13,10 +13,10 @@
 kea_dhcp4_interfaces: [ens19.10, ens19.20]
 
 kea_dhcp4_option_data:
-  - { name: domain-name-servers, data: 10.100.0.2,8.8.8.8 }
+  - { name: domain-name-servers, data: "10.100.0.2,8.8.8.8" }
   - { name: domain-name, data: citadel.local }
   - { name: domain-search, data: citadel.local }
-  - { name: ntp-servers, data: 10.100.0.2,216.239.35.0 }
+  - { name: ntp-servers, data: "10.100.0.2,216.239.35.0" }
 
 kea_dhcp4_subnets:
   - id: 10
