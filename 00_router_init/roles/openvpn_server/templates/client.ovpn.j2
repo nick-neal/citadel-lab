@@ -1,0 +1,27 @@
+# OpenVPN client profile: {{ item.name }}
+# Contains this client's private key - send it privately.
+client
+dev tun
+proto {{ openvpn_server_proto }}
+remote {{ openvpn_server_remote }} {{ openvpn_server_port }}
+resolv-retry infinite
+nobind
+persist-key
+persist-tun
+remote-cert-tls server
+verify-x509-name server name
+tls-version-min {{ openvpn_server_tls_version_min }}
+data-ciphers {{ openvpn_server_data_ciphers }}
+verb 3
+<ca>
+{{ openvpn_server__ca | trim }}
+</ca>
+<cert>
+{{ openvpn_server__cert | regex_search('-----BEGIN CERTIFICATE-----[\s\S]+?-----END CERTIFICATE-----') }}
+</cert>
+<key>
+{{ openvpn_server__key | trim }}
+</key>
+<tls-crypt>
+{{ openvpn_server__tls_crypt | trim }}
+</tls-crypt>

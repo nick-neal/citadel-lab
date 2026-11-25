@@ -1,0 +1,108 @@
+- name: Check this is a supported distro
+  ansible.builtin.assert:
+    that: ansible_facts.os_family in ['Debian']
+    fail_msg: "nftables role supports Debian/Ubuntu and RHEL-family hosts, not {{ ansible_facts.os_family }}"
+    quiet: true
+
+- name: Load distro-specific paths
+  ansible.builtin.include_vars: "{{ ansible_facts.os_family }}.yml"
+
+- name: Check nftables_zones in the inventory
+  ansible.builtin.assert:
+    that:
+      - nftables_zones | length > 0
+      - nftables_zones | rejectattr('name', 'defined') | list | length == 0
+      - nftables_zones | rejectattr('name', 'match', '^[a-z][a-z0-9_]*$') | list | length == 0
+      - nftables_zones | map(attribute='name') | unique | list | length == nftables_zones | length
+      - nftables_zones | rejectattr('interface', 'defined') | list | length == 0
+      - nftables_zones | rejectattr('networks', 'defined') | list | length == 0
+      - nftables_zones | selectattr('inside', 'defined') | selectattr('inside') | list | length > 0
+      - (nftables_zones | map(attribute='from_policy', default='open') | list
+         + nftables_zones | map(attribute='to_policy', default='open') | list)
+        is subset(['open', 'locked'])
+      - nftables_masquerade_zone == '' or nftables_masquerade_zone in nftables_zones | map(attribute='name')
+    fail_msg: >-
+      nftables_zones needs at least one zone with inside: true, and every zone
+      needs a unique lowercase name, an interface and networks. Policies must
+      be open or locked; nftables_masquerade_zone must name a zone.
+    quiet: true
+
+- name: Install nftables
+  ansible.builtin.package:
+    name: nftables
+    state: present
+
+- name: Gather service state (to find other firewalls)
+  ansible.builtin.service_facts:
+  when: nftables_disable_other_firewalls
+
+- name: Stop, disable and mask other firewalls
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: stopped
+    enabled: false
+    masked: true
+  loop: [firewalld, ufw]
+  when:
+    - nftables_disable_other_firewalls
+    - (item ~ '.service') in ansible_facts.services
+
+- name: Enable IP forwarding
+  ansible.posix.sysctl:
+    name: net.ipv4.ip_forward
+    value: "1"
+    sysctl_file: /etc/sysctl.d/90-nftables-router.conf
+    sysctl_set: true
+  when: nftables_ip_forward
+
+# 1) Render a complete copy into /run and check it with "nft -c". A typo in the
+#    inventory stops the play here; the live files are never touched.
+- name: Render staging copy of the ruleset
+  ansible.builtin.include_tasks: render.yml
+  vars:
+    nftables__dir: /run/nftables-staging
+    nftables__conf: /run/nftables-staging/nftables.conf
+
+- name: Check the staged ruleset
+  ansible.builtin.command: nft -c -f /run/nftables-staging/nftables.conf
+  changed_when: false
+
+# 2) It's valid: write the live files.
+- name: Render live ruleset
+  ansible.builtin.include_tasks: render.yml
+  vars:
+    nftables__dir: "{{ nftables_include_dir }}"
+    nftables__conf: "{{ nftables_conf }}"
+
+- name: Find zone files on the host
+  ansible.builtin.find:
+    paths: "{{ nftables_include_dir }}/zones"
+    patterns: "*.nft"
+  register: nftables__zone_files
+
+- name: Remove zone files for zones no longer in the inventory
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: absent
+  loop: "{{ nftables__zone_files.files }}"
+  loop_control:
+    label: "{{ item.path | basename }}"
+  vars:
+    nftables__zone_basenames: "{{ nftables_zones | map(attribute='name') | map('regex_replace', '$', '.nft') | list }}"
+  when: >-
+    item.path | basename not in
+    (nftables__zone_basenames | map('regex_replace', '^', 'from_') | list
+     + nftables__zone_basenames | map('regex_replace', '^', 'to_') | list)
+
+# 3) Load it, with automatic rollback if Ansible loses the host.
+- name: Apply the new ruleset
+  ansible.builtin.include_tasks: apply.yml
+  when: >-
+    nftables_force_apply
+    or nftables__main is changed or nftables__defines is changed
+    or nftables__nat is changed or nftables__zones is changed
+
+- name: Load the ruleset at boot
+  ansible.builtin.systemd:
+    name: nftables
+    enabled: true

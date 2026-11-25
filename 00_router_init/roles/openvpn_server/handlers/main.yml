@@ -1,0 +1,6 @@
+---
+# Restart drops connected clients for a few seconds; they reconnect by themselves.
+- name: Restart openvpn-server
+  ansible.builtin.systemd:
+    name: openvpn-server@server
+    state: restarted

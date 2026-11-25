@@ -1,0 +1,19 @@
+# {{ ansible_managed }}
+{% set inside = nftables_zones | selectattr('inside', 'defined') | selectattr('inside') | list %}
+
+# One interface and network set per zone
+{% for z in nftables_zones %}
+define {{ z.name | upper }}_IF = "{{ z.interface }}"
+define {{ z.name | upper }}_NET = { {{ z.networks | join(', ') }} }
+{% endfor %}
+
+# Everything on the inside of the router
+define INSIDE_IFS = { {% for z in inside %}${{ z.name | upper }}_IF{{ ', ' if not loop.last }}{% endfor %} }
+define INSIDE_NETS = { {% for z in inside %}${{ z.name | upper }}_NET{{ ', ' if not loop.last }}{% endfor %} }
+{% if nftables_defines %}
+
+# Extra defines (nftables_defines)
+{% for name, value in nftables_defines.items() %}
+define {{ name }} = {{ value }}
+{% endfor %}
+{% endif %}

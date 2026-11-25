@@ -1,0 +1,49 @@
+---
+- name: Create zones directory under {{ nftables__dir }}
+  ansible.builtin.file:
+    path: "{{ nftables__dir }}/zones"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Render main ruleset file {{ nftables__conf }}
+  ansible.builtin.template:
+    src: nftables.conf.j2
+    dest: "{{ nftables__conf }}"
+    owner: root
+    group: root
+    mode: "0644"
+  register: nftables__main
+
+- name: Render defines.nft
+  ansible.builtin.template:
+    src: defines.nft.j2
+    dest: "{{ nftables__dir }}/defines.nft"
+    owner: root
+    group: root
+    mode: "0644"
+  register: nftables__defines
+
+- name: Render nat.nft
+  ansible.builtin.template:
+    src: nat.nft.j2
+    dest: "{{ nftables__dir }}/nat.nft"
+    owner: root
+    group: root
+    mode: "0644"
+  register: nftables__nat
+
+- name: Render zone files
+  ansible.builtin.template:
+    src: "zone-{{ item.1 }}.nft.j2"
+    dest: "{{ nftables__dir }}/zones/{{ item.1 }}_{{ item.0.name }}.nft"
+    owner: root
+    group: root
+    mode: "0644"
+  vars:
+    nftables__zone: "{{ item.0 }}"
+  loop: "{{ nftables_zones | product(['from', 'to']) | list }}"
+  loop_control:
+    label: "{{ item.1 }}_{{ item.0.name }}.nft"
+  register: nftables__zones

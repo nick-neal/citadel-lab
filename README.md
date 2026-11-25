@@ -1,7 +1,10 @@
 # Citadel Lab
+This is meant to be built on proxmox.
+
 ## Stages
 | Name | Description |
 | --- | --- |
+| 00_router_init | This is what builds the router for the network. run this before any other playbook. |
 | 00_default | This is base ansible deployment. This will configure the network, and other services. |
 
 ## Setup

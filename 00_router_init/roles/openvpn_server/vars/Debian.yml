@@ -1,0 +1,4 @@
+---
+openvpn_server_easyrsa_src: /usr/share/easy-rsa
+openvpn_server_run_user: nobody
+openvpn_server_run_group: nogroup
