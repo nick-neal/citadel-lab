@@ -8,6 +8,18 @@ This is meant to be built on proxmox.
 | 00_default | This is base ansible deployment. This will configure the network, and other services. |
 
 ## Setup
+### Add terraform user to proxmox
+```bash
+# create terraform role (for proxmox version 9)
+pveum role add terraform-role -privs "VM.Allocate VM.Clone VM.Config.CDROM VM.Config.CPU VM.Config.Cloudinit VM.Config.Disk VM.Config.HWType VM.Config.Memory VM.Config.Network VM.Config.Options VM.GuestAgent.Audit VM.Audit VM.PowerMgmt Datastore.AllocateSpace Datastore.Audit Sys.Audit"
+
+# create terraform user and auth token
+pveum user add terraform@pve
+pveum aclmod / -user terraform@pve -role terraform-role
+pveum user token add terraform@pve terraform-token --privsep=0
+
+```
+
 From a dedicated ansible host, run the following:
 
 ```bash
@@ -23,3 +35,6 @@ cd ~/ansible                         # your project folder
 ansible-galaxy collection install -r requirements.yml
 ansible all -m ping                  # every host should answer "pong"
 ```
+
+## Documentation
+- [Setup proxmox to use terraform](https://tcude.net/using-terraform-with-proxmox/)

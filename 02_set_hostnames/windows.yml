@@ -1,0 +1,47 @@
+---
+- name: Reissue Windows OpenSSH Host Keys
+  hosts: windows_hosts
+  gather_facts: false
+
+  vars:
+    ssh_dir: 'C:\ProgramData\ssh'
+    # Change to 'C:\Program Files\OpenSSH' if installed via MSI/GitHub instead of Windows Features
+    openssh_install_dir: 'C:\Windows\System32\OpenSSH'
+
+  tasks:
+    - name: Find existing SSH host keys
+      ansible.windows.win_find:
+        paths: "{{ ssh_dir }}"
+        patterns: 'ssh_host_*'
+      register: old_host_keys
+
+    - name: Remove existing SSH host keys
+      ansible.windows.win_file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ old_host_keys.files }}"
+      when: old_host_keys.matched > 0
+
+    - name: Generate new SSH host keys
+      ansible.windows.win_shell: |
+        ssh-keygen -t rsa -b 4096 -f "{{ ssh_dir }}\ssh_host_rsa_key" -N '""'
+        ssh-keygen -t ecdsa -f "{{ ssh_dir }}\ssh_host_ecdsa_key" -N '""'
+        ssh-keygen -t ed25519 -f "{{ ssh_dir }}\ssh_host_ed25519_key" -N '""'
+      args:
+        creates: "{{ ssh_dir }}\\ssh_host_ed25519_key"
+
+    - name: Fix OpenSSH host file permissions
+      ansible.windows.win_shell: |
+        . "{{ openssh_install_dir }}\FixHostFilePermissions.ps1" -Confirm:$false
+      changed_when: true
+
+    - name: Restart sshd service asynchronously to avoid dropping connection mid-task
+      ansible.windows.win_shell: Start-Sleep -Seconds 2; Restart-Service sshd
+      async: 15
+      poll: 0
+      changed_when: true
+
+    - name: Wait for Windows host to become reachable again
+      ansible.builtin.wait_for_connection:
+        delay: 5
+        timeout: 60
