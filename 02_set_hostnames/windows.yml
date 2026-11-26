@@ -7,45 +7,109 @@
     ssh_dir: 'C:\ProgramData\ssh'
     # Change to 'C:\Program Files\OpenSSH' if installed via MSI/GitHub instead of Windows Features
     openssh_install_dir: 'C:\Windows\System32\OpenSSH'
+    reboot_after_rename: true
+    # Name the controller uses for SSH, for known_hosts entries
+    ssh_target: "{{ ansible_host | default(inventory_hostname) }}"
+    ssh_port: "{{ ansible_port | default(22) | int }}"
+    known_hosts_name: >-
+      {{ ssh_target if ssh_port | int == 22 else '[' ~ ssh_target ~ ']:' ~ ssh_port }}
 
   tasks:
-    - name: Find existing SSH host keys
-      ansible.windows.win_find:
-        paths: "{{ ssh_dir }}"
-        patterns: 'ssh_host_*'
-      register: old_host_keys
+    # Old keys stay in place until all new ones exist. sshd on Windows re-reads
+    # host keys for every new connection, so deleting them first (the previous
+    # approach) breaks SSH immediately.
+    - name: Generate new SSH host keys and swap them in
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = 'Stop'
+        $sshDir = '{{ ssh_dir }}'
+        $keygen = Join-Path '{{ openssh_install_dir }}' 'ssh-keygen.exe'
+        $types = [ordered]@{ rsa = '-t rsa -b 4096'; ecdsa = '-t ecdsa -b 256'; ed25519 = '-t ed25519' }
 
-    - name: Remove existing SSH host keys
-      ansible.windows.win_file:
-        path: "{{ item.path }}"
+        foreach ($name in $types.Keys) {
+            $tmp = Join-Path $sshDir "ssh_host_${name}_key.new"
+            Remove-Item -LiteralPath $tmp, "$tmp.pub" -Force -ErrorAction SilentlyContinue
+            # Single argument string keeps the empty passphrase (-N "") intact
+            $p = Start-Process -FilePath $keygen -Wait -NoNewWindow -PassThru `
+                -ArgumentList "-q $($types[$name]) -N `"`" -f `"$tmp`""
+            if ($p.ExitCode -ne 0) { throw "ssh-keygen failed for $name (exit $($p.ExitCode))" }
+        }
+
+        # All generated: swap in, and drop obsolete DSA keys
+        foreach ($name in $types.Keys) {
+            $final = Join-Path $sshDir "ssh_host_${name}_key"
+            Move-Item -LiteralPath "$final.new" -Destination $final -Force
+            Move-Item -LiteralPath "$final.new.pub" -Destination "$final.pub" -Force
+        }
+        Remove-Item -LiteralPath (Join-Path $sshDir 'ssh_host_dsa_key'), (Join-Path $sshDir 'ssh_host_dsa_key.pub') `
+            -Force -ErrorAction SilentlyContinue
+
+        # Restrict private keys to SYSTEM + Administrators (what sshd requires)
+        $system = New-Object System.Security.Principal.SecurityIdentifier('S-1-5-18')
+        $admins = New-Object System.Security.Principal.SecurityIdentifier('S-1-5-32-544')
+        $pubKeys = foreach ($name in $types.Keys) {
+            $final = Join-Path $sshDir "ssh_host_${name}_key"
+            $acl = New-Object System.Security.AccessControl.FileSecurity
+            $acl.SetAccessRuleProtection($true, $false)
+            foreach ($sid in $system, $admins) {
+                $acl.AddAccessRule((New-Object System.Security.AccessControl.FileSystemAccessRule($sid, 'FullControl', 'Allow')))
+            }
+            $acl.SetOwner($admins)
+            Set-Acl -LiteralPath $final -AclObject $acl
+            (Get-Content -LiteralPath "$final.pub" -Raw).Trim()
+        }
+
+        # Restart sshd from a WMI-created process (outside this SSH session)
+        # so the restart survives this session being dropped.
+        $restart = 'powershell.exe -NoProfile -NonInteractive -Command "Start-Sleep -Seconds 5; Restart-Service -Name sshd -Force"'
+        $null = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = $restart }
+
+        ConvertTo-Json -InputObject @($pubKeys) -Compress
+      register: keygen_result
+
+    - name: Parse new public keys
+      ansible.builtin.set_fact:
+        new_pub_keys: "{{ keygen_result.stdout | trim | from_json }}"
+
+    # ---- Reconnect: the host now presents a different key ----
+
+    - name: Drop the persistent connection that used the old host key
+      ansible.builtin.meta: reset_connection
+
+    - name: Wait for sshd to restart
+      ansible.builtin.wait_for:
+        host: "{{ ssh_target }}"
+        port: "{{ ssh_port }}"
+        delay: 10
+        timeout: 120
+      delegate_to: localhost
+      become: false
+
+    - name: Remove old host key from local known_hosts
+      ansible.builtin.known_hosts:
+        name: "{{ known_hosts_name }}"
         state: absent
-      loop: "{{ old_host_keys.files }}"
-      when: old_host_keys.matched > 0
+      delegate_to: localhost
+      become: false
+      throttle: 1
 
-    - name: Generate new SSH host keys
-      ansible.windows.win_shell: |
-        ssh-keygen -t rsa -b 4096 -f "{{ ssh_dir }}\ssh_host_rsa_key" -N '""'
-        ssh-keygen -t ecdsa -f "{{ ssh_dir }}\ssh_host_ecdsa_key" -N '""'
-        ssh-keygen -t ed25519 -f "{{ ssh_dir }}\ssh_host_ed25519_key" -N '""'
-      args:
-        creates: "{{ ssh_dir }}\\ssh_host_ed25519_key"
-
-    - name: Fix OpenSSH host file permissions
-      ansible.windows.win_shell: |
-        . "{{ openssh_install_dir }}\FixHostFilePermissions.ps1" -Confirm:$false
-      changed_when: true
-
-    - name: Restart sshd service asynchronously to avoid dropping connection mid-task
-      ansible.windows.win_shell: Start-Sleep -Seconds 2; Restart-Service sshd
-      async: 15
-      poll: 0
-      changed_when: true
+    - name: Add new host keys to local known_hosts
+      ansible.builtin.known_hosts:
+        name: "{{ known_hosts_name }}"
+        key: "{{ known_hosts_name }} {{ item.split()[0] }} {{ item.split()[1] }}"
+      loop: "{{ new_pub_keys }}"
+      loop_control:
+        label: "{{ item.split()[0] }}"
+      delegate_to: localhost
+      become: false
+      throttle: 1
 
     - name: Wait for Windows host to become reachable again
       ansible.builtin.wait_for_connection:
-        delay: 5
+        delay: 2
         timeout: 60
-    
+
+    # ---- Rename ----
+
     - name: Change hostname
       ansible.windows.win_hostname:
         name: "{{ inventory_hostname_short }}"
