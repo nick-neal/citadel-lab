@@ -1,6 +1,6 @@
 # proxmox endpoint
 variable "proxmox_endpoint" {
-    default = "https://pve.citadel:8006/"
+    default = "https://192.168.0.183:8006/"
 }
 
 # for storing the API token
