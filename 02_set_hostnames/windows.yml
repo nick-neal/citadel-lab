@@ -1,6 +1,6 @@
 ---
 - name: Reissue Windows OpenSSH Host Keys
-  hosts: windows_hosts
+  hosts: windows
   gather_facts: false
 
   vars:

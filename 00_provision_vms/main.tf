@@ -8,8 +8,8 @@ terraform {
 }
 
 provider "proxmox" {
-    endpoint = vars.proxmox_endpoint
-    api_token = vars.api_token
+    endpoint = var.proxmox_endpoint
+    api_token = var.api_token
     insecure = true
 }
 
@@ -27,7 +27,7 @@ resource "proxmox_cloned_vm" "dc01" {
     }
 
     clone = {
-        source_vm_id = vars.server_2022_template_id
+        source_vm_id = var.server_2022_template_id
     }
 
     network = {
@@ -35,7 +35,7 @@ resource "proxmox_cloned_vm" "dc01" {
             bridge = "vmbr1"
             model = "virtio"
             tag = 10
-            mac_address = vars.dc01_mac_address
+            mac_address = var.dc01_mac_address
         }
     }
 }

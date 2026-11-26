@@ -4,7 +4,10 @@ variable "proxmox_endpoint" {
 }
 
 # for storing the API token
-variable "api_token" {}
+variable "api_token" {
+    type = string
+    sensitive = true
+}
 
 # which node the VM will go on
 variable "proxmox_node_name" {
