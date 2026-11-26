@@ -45,3 +45,23 @@
       ansible.builtin.wait_for_connection:
         delay: 5
         timeout: 60
+    
+    - name: Change hostname
+      ansible.windows.win_hostname:
+        name: "{{ inventory_hostname_short }}"
+      register: rename_result
+
+    - name: Reboot to apply new hostname
+      ansible.windows.win_reboot:
+        reboot_timeout: 600
+        msg: "Rebooting to apply new hostname {{ inventory_hostname_short }}"
+      when:
+        - rename_result.reboot_required
+        - reboot_after_rename | bool
+
+    - name: Note pending reboot
+      ansible.builtin.debug:
+        msg: "{{ inventory_hostname }} will be named {{ inventory_hostname_short }} after its next reboot."
+      when:
+        - rename_result.reboot_required
+        - not (reboot_after_rename | bool)
