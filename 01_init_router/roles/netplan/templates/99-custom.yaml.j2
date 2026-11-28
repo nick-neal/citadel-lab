@@ -1,6 +1,6 @@
 network:
   version: 2
   ethernets: 
-  {{ netplan_interfaces | to_yaml(indent=4) }}
+    {{ netplan_interfaces | to_nice_yaml(indent=2) | trim | indent(4) }}
   vlans: 
-  {{ netplan_vlans | to_yaml(indent=4) }}
+    {{ netplan_vlans | to_nice_yaml(indent=2) | trim | indent(4) }}
