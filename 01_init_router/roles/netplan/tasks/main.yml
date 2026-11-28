@@ -10,7 +10,7 @@
     dest: /etc/netplan/99-custom.yaml
     owner: root
     group: root
-    mode: "0644"
+    mode: "0600"
 
 - name: Verify netplan configuration
   ansible.builtin.command: netplan generate
