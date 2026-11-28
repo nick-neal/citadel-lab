@@ -1,4 +1,6 @@
 network:
   version: 2
-  ethernets: {{ netplan_interfaces | to_yaml }}
-  vlans: {{ netplan_vlans | to_yaml }}
+  ethernets: 
+  {{ netplan_interfaces | to_yaml(indent=4) }}
+  vlans: 
+  {{ netplan_vlans | to_yaml(indent=4) }}
