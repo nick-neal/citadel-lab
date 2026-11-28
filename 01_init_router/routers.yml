@@ -2,6 +2,7 @@
   hosts: routers
   become: true
   roles:
+    - netplan
     - kea_dhcp4
     - nftables
     - openvpn_server    
