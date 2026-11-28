@@ -27,7 +27,7 @@ variable "ubuntu_2404_template_id" {
 # ====================
 
 variable "gw01_mac_address" {
-    default = "BC:24:11:56:B9:A7"
+    default = "BC:24:11:72:D4:99"
 }
 
 # ====================

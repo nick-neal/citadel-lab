@@ -18,9 +18,9 @@ provider "proxmox" {
     }
 }
 
-resource "proxmox_cloned_vm" "gw01_test" {
+resource "proxmox_cloned_vm" "gw01" {
   node_name = var.proxmox_node_name
-  name      = "gw01-test"
+  name      = "gw01"
 
   clone = {
     source_vm_id = var.ubuntu_2404_template_id
