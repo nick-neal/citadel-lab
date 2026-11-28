@@ -57,7 +57,6 @@ resource "proxmox_cloned_vm" "gw01_test" {
   }
 }
 
-/*
 resource "proxmox_cloned_vm" "dc01" {
     node_name = var.proxmox_node_name
     name      = "dc01"
@@ -85,4 +84,3 @@ resource "proxmox_cloned_vm" "dc01" {
         }
     }
 }
-*/
