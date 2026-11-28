@@ -46,12 +46,12 @@ kea_dhcp4_subnets:
       - hw-address: "BC:24:11:56:B2:CB"
         ip-address: 10.100.0.2
         hostname: dc01.citadel.local
-      #- hw-address: "00:00:00:00:00:00"
-      #  ip-address: 10.100.0.10
-      #  hostname: db01.citadel.local
-      #- hw-address: "00:00:00:00:00:00"
-      #  ip-address: 10.100.0.20
-      #  hostname: elk.citadel.local
+      - hw-address: "BC:24:11:56:B2:E7"
+        ip-address: 10.100.0.5
+        hostname: db01.citadel.local
+      - hw-address: "BC:24:11:56:B2:D4"
+        ip-address: 10.100.0.10
+        hostname: elk.citadel.local
   - id: 20
     subnet: 172.20.0.0/24
     interface: ens19.20
@@ -130,7 +130,7 @@ nftables_input_rules:
 # OPENVPN
 # =====================================================================
 # Must resolve to gw01's WAN address (now 192.168.0.65, from DHCP)
-openvpn_server_remote: vpn.citadel.local
+openvpn_server_remote: vpn.citadel
 openvpn_server_network: 172.18.0.0/24
 openvpn_server_push_routes:
   - 10.100.0.0/24

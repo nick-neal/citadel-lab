@@ -29,11 +29,3 @@ variable "ubuntu_2404_template_id" {
 variable "gw01_mac_address" {
     default = "BC:24:11:72:D4:99"
 }
-
-# ====================
-# DC01
-# ====================
-
-variable "dc01_mac_address" {
-    default = "BC:24:11:56:B2:CB"
-}
