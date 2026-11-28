@@ -2,4 +2,5 @@
   hosts: elk
   become: true
   roles:
-    - docker  
+    - docker
+    - docker-elk

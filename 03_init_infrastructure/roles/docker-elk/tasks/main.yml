@@ -1,0 +1,76 @@
+---
+- name: Check this is a supported distro
+  ansible.builtin.assert:
+    that: ansible_facts.os_family in ['Debian']
+    fail_msg: "this kea_dhcp4 role only supports Debian/Ubuntu hosts, not {{ ansible_facts.os_family }}"
+    quiet: true
+
+- name: Install git
+  ansible.builtin.package:
+    name: git
+    state: present
+
+- name: Raise vm,max_map_count
+  ansible.posix.sysctl:
+    name: vm.max_map_count
+    value: "262144"
+    sysctl_set: true
+    state: present
+
+- name: Clone / update docker-elk
+  ansible.builtin.git:
+    repo: "{{ elk_repo }}"
+    dest: "{{ elk_dir }}"
+    version: "{{ elk_branch }}"
+    force: true # discard local edits; .env reapplied later
+  register: elk_repo_result
+
+- name: Set passwords in .env file
+  ansible.builtin.lineinfile:
+    path: "{{ elk_dir }}/.env"
+    regexp: "^{{ item.key }}="
+    line: "{{ item.key }}='{{ item.value }}'"
+  loop: "{{ elk_env | dict2items }}"
+  loop_control: 
+    label: "{{ item.key }}"
+  no_log: true
+  register: elk_env_result
+
+- name: Pin Elastic stack version
+  ansible.builtin.lineinfile:
+    path: "{{ elk_dir }}/.env"
+    regexp: "^ELASTIC_VERSION="
+    line: "ELASTIC_VERSION={{ elk_version }}"
+  when: elk_version | length > 0
+  register: elk_version_result
+
+- name: Build images
+  ansible.builtin.command: docker compose build
+  args:
+    chdir: "{{ elk_dir }}"
+  when: elk_repo_result.changed or elk_version_result.changed
+
+- name: Initialize Elasticsearch users (one-shot setup service)
+  ansible.builtin.command: docker compose run --rm setup
+  args:
+    chdir: "{{ elk_dir }}"
+  when: elk_repo_result.changed or elk_env_result.changed  
+
+- name: Start the stack
+  community.docker.docker_compose_v2:
+    project_src: "{{ elk_dir }}"
+    state: present
+    recreate: "{{ 'always' if (elk_env_result.changed or elk_version_result.changed) else 'auto' }}"
+
+- name: Wait for Kibana
+  ansible.builtin.uri:
+    url: "http://localhost:5601/api/status"
+    user: elastic
+    password: "{{ elk_env.ELASTIC_PASSWORD }}"
+    force_basic_auth: true
+    status_code: 200
+  register: kibana_status
+  until: kibana_status.status == 200
+  retries: 30
+  delay: 10
+  no_log: true

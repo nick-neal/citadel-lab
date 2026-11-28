@@ -1,3 +1,6 @@
 ---
 roles:
   - name: microsoft.ad
+collections:
+  - name: community.docker
+  - name: ansible.posix

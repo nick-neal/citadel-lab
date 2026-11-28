@@ -1,0 +1,11 @@
+elk_dir: /opt/docker-elk
+elk_repo: https://github.com/deviantony/docker-elk.git
+elk_branch: main
+elk_version: ""
+# these passwords are set like this because this will 
+# be a walled off, intentionally vulnerable environment. 
+# Otherwise, use a vault!
+elk_env:
+  ELASTIC_PASSWORD: "changeme"
+  LOGSTASH_INTERNAL_PASSWORD: "changeme"
+  KIBANA_SYSTEM_PASSWORD: "changeme"
