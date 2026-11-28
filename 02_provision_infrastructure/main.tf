@@ -86,6 +86,7 @@ resource "proxmox_cloned_vm" "elk" {
   cpu = {
     sockets = 1
     cores   = 1
+    type    = "x86-64-v2-AES"
   }
 
   memory = {
