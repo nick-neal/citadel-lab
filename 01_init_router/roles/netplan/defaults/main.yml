@@ -1,0 +1,7 @@
+# set main interface to DHCP
+netplan_interfaces:
+  - ens18:  
+    dhcp4: true
+
+# this is where vlan configs go
+netplan_vlans: []

@@ -1,0 +1,5 @@
+- name: test netplan
+  hosts: routers
+  become: true
+  roles:
+    - netplan  

@@ -1,0 +1,19 @@
+- name: Check this is a supported distro
+  ansible.builtin.assert:
+    that: ansible_facts.os_family in ['Debian']
+    fail_msg: "this kea_dhcp4 role only supports Debian/Ubuntu hosts, not {{ ansible_facts.os_family }}"
+    quiet: true
+
+- name: Render candidiate netplan config
+  ansible.builtin.template:
+    src: 99-custom.yaml.j2
+    dest: /etc/netplan/99-custom.yaml
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Verify netplan configuration
+  ansible.builtin.command: netplan generate
+
+- name: Apply netplan config
+  ansible.builtin.meta: flush_handlers
