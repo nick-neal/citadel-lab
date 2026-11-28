@@ -1,3 +1,0 @@
-{% from 'netmask.j2' import netmask %}
-# {{ ansible_managed }}
-ifconfig-push {{ item.ip }} {{ netmask(openvpn_server_network) }}
