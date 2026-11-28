@@ -18,6 +18,22 @@ variable "server_2022_template_id" {
     default = 101
 }
 
+variable "ubuntu_2404_template_id" {
+    default = 9000
+}
+
+# ====================
+# GW01
+# ====================
+
+variable "gw01_mac_address" {
+    default = "BC:24:11:56:B9:A7"
+}
+
+# ====================
+# DC01
+# ====================
+
 variable "dc01_mac_address" {
     default = "BC:24:11:56:B2:CB"
 }
