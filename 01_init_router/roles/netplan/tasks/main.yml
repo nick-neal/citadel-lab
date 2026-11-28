@@ -7,7 +7,7 @@
 - name: Render candidiate netplan config
   ansible.builtin.template:
     src: 99-custom.yaml.j2
-    dest: /etc/netplan/99-custom.yaml
+    dest: /etc/netplan/50-cloud-init.yaml
     owner: root
     group: root
     mode: "0600"
@@ -16,4 +16,4 @@
   ansible.builtin.command: netplan generate
 
 - name: Apply netplan config
-  ansible.builtin.meta: flush_handlers
+  ansible.builtin.shell: netplan apply

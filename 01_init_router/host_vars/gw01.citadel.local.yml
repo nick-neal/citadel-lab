@@ -11,7 +11,7 @@
 # NETPLAN
 # =====================================================================
 netplan_interfaces:
-  ens18:  
+  eth0:  
     dhcp4: true
   ens19:
     dhcp4: false
@@ -72,7 +72,7 @@ nftables_defines:
 
 nftables_zones:
   - name: wan
-    interface: ens18
+    interface: eth0
     networks: [192.168.0.0/16]
     inside: false
     to_rules:
